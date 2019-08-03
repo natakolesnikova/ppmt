@@ -2,41 +2,52 @@ package com.nata.ppmt.controller;
 
 import com.nata.ppmt.persistence.domain.Project;
 import com.nata.ppmt.service.ProjectService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.nata.ppmt.service.ValidationErrorService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.util.HashMap;
-import java.util.Map;
+
+import static java.util.Objects.nonNull;
 
 @RestController
 @RequestMapping("/api/project")
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ValidationErrorService validationErrorService;
 
-    public ProjectController(ProjectService projectService) {
+    public ProjectController(ProjectService projectService, ValidationErrorService validationErrorService) {
         this.projectService = projectService;
+        this.validationErrorService = validationErrorService;
     }
 
     @PostMapping()
     public ResponseEntity<?> createNewProject(@Valid @RequestBody Project project, BindingResult bindingResult) {
-        if (bindingResult.hasErrors()) {
-            Map<String, String> errorMap = new HashMap<>();
-            for (FieldError error: bindingResult.getFieldErrors()) {
-                errorMap.put(error.getField(), error.getDefaultMessage());
-            }
-
-            return new ResponseEntity<Map>(errorMap, HttpStatus.BAD_REQUEST);
+        ResponseEntity<?> responseEntity = validationErrorService.validateAndReturnErrors(bindingResult);
+        if (nonNull(responseEntity)) {
+            return responseEntity;
         }
+
         Project project1 = projectService.saveOrUpdateProject(project);
         return new ResponseEntity<>(project1, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{projectId}")
+    public ResponseEntity<?> getProjectById(@PathVariable String projectId) {
+        return new ResponseEntity<>(projectService.getProjectById(projectId), HttpStatus.OK);
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<?> getListOfAllProjects() {
+        return new ResponseEntity<>(projectService.getAllProjects(), HttpStatus.OK);
+    }
+
+    @DeleteMapping("/{projectId}")
+    public ResponseEntity<?> deleteProjectById(@PathVariable String projectId) {
+        projectService.deleteProjectById(projectId);
+        return new ResponseEntity<String>("Project with ID '" + projectId+ "' was deleted", HttpStatus.OK);
     }
 }
